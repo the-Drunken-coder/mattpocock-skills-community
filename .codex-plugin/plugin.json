@@ -1,0 +1,31 @@
+{
+  "name": "mattpocock-skills-community",
+  "version": "0.1.0+upstream.3cca18b3",
+  "description": "Unofficial Codex package of Matt Pocock's MIT-licensed engineering skills.",
+  "author": {
+    "name": "Lane Araujo"
+  },
+  "homepage": "https://github.com/mattpocock/skills",
+  "license": "MIT",
+  "keywords": [
+    "engineering",
+    "tdd",
+    "code-review",
+    "domain-modeling",
+    "productivity"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Matt Pocock skills (community)",
+    "shortDescription": "Unofficial MIT-licensed engineering skills for Codex.",
+    "longDescription": "A community-maintained Codex package of the promoted engineering and productivity skills from Matt Pocock's skills repository. It is not affiliated with or endorsed by Matt Pocock, AI Hero, or OpenAI.",
+    "developerName": "Lane Araujo",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": [
+      "Help me choose the right engineering skill.",
+      "Run a disciplined debugging workflow.",
+      "Review this change against its specification."
+    ]
+  }
+}
