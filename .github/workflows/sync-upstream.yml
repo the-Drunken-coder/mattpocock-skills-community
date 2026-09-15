@@ -41,6 +41,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .codex-plugin/plugin.json plugin.json LICENSE THIRD_PARTY_NOTICES.md skills scripts
+          git add .agents/plugins/marketplace.json .codex-plugin/plugin.json plugin.json LICENSE THIRD_PARTY_NOTICES.md skills scripts
           git commit -m "chore: sync Matt Pocock skills"
           git push

@@ -1,0 +1,12 @@
+{
+  "name": "mattpocock-skills-community",
+  "interface": {
+    "displayName": "Matt Pocock skills (community)"
+  },
+  "plugins": [
+    {
+      "name": "mattpocock-skills-community",
+      "source": "."
+    }
+  ]
+}
