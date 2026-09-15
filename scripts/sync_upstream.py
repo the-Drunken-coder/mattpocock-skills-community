@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 
 REPOSITORY = "mattpocock/skills"
 DEFAULT_REF = "main"
+SKILL_PREFIX = "matt-"
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 DISABLE_INVOCATION_RE = re.compile(
     r"^(?P<indent>\s*)disable[-_]model[-_]invocation:\s*true\s*$"
@@ -90,6 +91,10 @@ def version_for_sha(current: str, sha: str) -> str:
     return f"{base}+upstream.{sha[:8]}"
 
 
+def prefixed_skill_name(name: str) -> str:
+    return name if name.startswith(SKILL_PREFIX) else f"{SKILL_PREFIX}{name}"
+
+
 def write_json(path: Path, payload: dict[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
@@ -108,6 +113,47 @@ def make_codex_compatible(skill_root: Path) -> None:
         skill_md.write_text(normalized, encoding="utf-8")
 
 
+def namespace_skill_tree(skill_root: Path, names: dict[str, str]) -> None:
+    """Give every copied skill a stable Matt-prefixed Codex name and references."""
+    for path in skill_root.rglob("*"):
+        if not path.is_file():
+            continue
+        try:
+            contents = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+
+        lines: list[str] = []
+        for line in contents.split("\n"):
+            if path.name == "SKILL.md":
+                for source_name, namespaced_name in names.items():
+                    line = re.sub(
+                        rf"^(\s*name:\s*){re.escape(source_name)}(\s*)$",
+                        rf"\g<1>{namespaced_name}\g<2>",
+                        line,
+                    )
+            if path.name == "openai.yaml" and line.lstrip().startswith("display_name:"):
+                prefix, value = line.split(":", maxsplit=1)
+                if not value.strip().startswith('"Matt:'):
+                    line = f'{prefix}: "Matt: {value.strip().strip(chr(34))}"'
+            for source_name, namespaced_name in names.items():
+                line = re.sub(
+                    rf"(?<![A-Za-z0-9_-])/{re.escape(source_name)}(?![A-Za-z0-9_-])",
+                    f"/{namespaced_name}",
+                    line,
+                )
+                line = line.replace(f"skills/{source_name}", f"skills/{namespaced_name}")
+                if "Skill tool" in line:
+                    line = line.replace(f'"{source_name}"', f'"{namespaced_name}"')
+                if "skill" in line.lower():
+                    line = line.replace(f"`{source_name}`", f"`{namespaced_name}`")
+            lines.append(line)
+
+        normalized = "\n".join(lines)
+        if normalized != contents:
+            path.write_text(normalized, encoding="utf-8")
+
+
 def sync(ref: str) -> str:
     sha = upstream_sha(ref)
     archive = fetch(f"https://github.com/{REPOSITORY}/archive/refs/heads/{quote(ref, safe='')}.tar.gz")
@@ -117,6 +163,10 @@ def sync(ref: str) -> str:
         manifest_path = upstream_root / ".claude-plugin" / "plugin.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         paths = promoted_skill_paths(manifest)
+        names = {
+            PurePosixPath(raw_path).name: prefixed_skill_name(PurePosixPath(raw_path).name)
+            for raw_path in paths
+        }
 
         skills_root = PLUGIN_ROOT / "skills"
         if skills_root.exists():
@@ -127,9 +177,10 @@ def sync(ref: str) -> str:
             source = upstream_root / PurePosixPath(raw_path.removeprefix("./"))
             if not (source / "SKILL.md").is_file():
                 raise RuntimeError(f"promoted skill is missing SKILL.md: {raw_path}")
-            destination = skills_root / source.name
+            destination = skills_root / names[source.name]
             shutil.copytree(source, destination, symlinks=False)
             make_codex_compatible(destination)
+            namespace_skill_tree(destination, names)
 
         shutil.copy2(upstream_root / "LICENSE", PLUGIN_ROOT / "LICENSE")
 
@@ -152,6 +203,7 @@ def sync(ref: str) -> str:
         f"- Upstream commit used for this build: `{sha}`\n"
         f"- Included content: the {len(paths)} skills listed by upstream's promoted Claude Code plugin manifest\n"
         "- Excluded content: upstream's `misc/`, `in-progress/`, and `deprecated/` buckets\n"
+        f"- Codex skill namespace: every included skill is prefixed with `{SKILL_PREFIX}`\n"
         "- Codex adaptation: Claude-only `disable-model-invocation: true` metadata is normalized to `false`\n"
         "- License: MIT, reproduced in [`LICENSE`](./LICENSE)\n\n"
         "The package is maintained independently. It is not affiliated with or endorsed by "

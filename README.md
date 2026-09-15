@@ -2,6 +2,8 @@
 
 This is an unofficial Codex package containing the 25 engineering and productivity skills selected by Matt Pocock's upstream Claude Code plugin manifest. It is not affiliated with or endorsed by Matt Pocock, AI Hero, or OpenAI.
 
+Every skill is namespaced with the `matt-` prefix, for example `/matt-code-review`, so these skills do not collide with other Codex skills.
+
 The included skill files and `LICENSE` are copied from [mattpocock/skills](https://github.com/mattpocock/skills) under its MIT license. The package keeps its own Codex metadata and synchronization code so the upstream content can be reviewed separately.
 
 Codex's plugin ingestion contract does not accept Claude Code's `disable-model-invocation: true` flag. The sync normalizes that flag to `false` and records the adaptation in `THIRD_PARTY_NOTICES.md`.
