@@ -1,6 +1,6 @@
 # Matt Pocock skills for Codex
 
-This is an unofficial Codex package containing the 25 engineering and productivity skills selected by Matt Pocock's upstream Claude Code plugin manifest. It is not affiliated with or endorsed by Matt Pocock, AI Hero, or OpenAI.
+This is an unofficial Codex package containing the engineering and productivity skills selected by Matt Pocock's upstream Claude Code plugin manifest, plus every skill in upstream's `skills/in-progress/` directory. It is not affiliated with or endorsed by Matt Pocock, AI Hero, or OpenAI.
 
 Every skill is namespaced with the `matt-` prefix, for example `/matt-code-review`, so these skills do not collide with other Codex skills.
 
@@ -20,10 +20,10 @@ From this directory, run:
 python3 scripts/sync_upstream.py --ref main
 ```
 
-The script reads the current upstream commit, copies only the promoted skills, updates both manifests with the short commit SHA, and records the full SHA in `THIRD_PARTY_NOTICES.md`.
+The script reads the current upstream commit, copies the promoted and in-progress skills, updates both manifests with the short commit SHA, and records the full SHA in `THIRD_PARTY_NOTICES.md`.
 
-The included GitHub Actions workflow runs this sync at 00:05 America/New_York each night and commits changes to the package's default branch. GitHub may delay scheduled jobs, and scheduled workflows only run when the repository's default branch is active.
+GitHub cannot directly trigger this repository's workflow when another repository changes. The included workflow therefore polls Matt Pocock's `main` branch every 15 minutes and commits changes when its generated package differs. GitHub may delay scheduled jobs, and scheduled workflows only run when the repository's default branch is active.
 
 ## Scope
 
-The package deliberately excludes upstream's `misc/`, `in-progress/`, and `deprecated/` buckets. Review upstream changes before enabling the nightly workflow on a public fork.
+The package deliberately excludes upstream's `misc/` and `deprecated/` buckets. In-progress skills can change or disappear without notice, so review automated updates on the package's default branch.

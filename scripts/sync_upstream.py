@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Synchronize the promoted skills from Matt Pocock's upstream repository."""
+"""Synchronize promoted and in-progress skills from Matt Pocock's repository."""
 
 from __future__ import annotations
 
@@ -66,7 +66,9 @@ def extract_archive(archive: bytes, destination: Path) -> Path:
     return roots[0]
 
 
-def promoted_skill_paths(manifest: dict[str, object]) -> list[str]:
+def selected_skill_paths(
+    upstream_root: Path, manifest: dict[str, object]
+) -> list[str]:
     if manifest.get("license") != "MIT":
         raise RuntimeError("upstream plugin manifest is no longer MIT-licensed")
     raw_paths = manifest.get("skills")
@@ -74,6 +76,15 @@ def promoted_skill_paths(manifest: dict[str, object]) -> list[str]:
         raise RuntimeError("upstream plugin manifest has no valid skills list")
 
     paths = list(raw_paths)
+    in_progress_root = upstream_root / "skills" / "in-progress"
+    if not in_progress_root.is_dir():
+        raise RuntimeError("upstream repository has no skills/in-progress directory")
+    paths.extend(
+        f"./{path.relative_to(upstream_root).as_posix()}"
+        for path in sorted(in_progress_root.iterdir())
+        if path.is_dir() and (path / "SKILL.md").is_file()
+    )
+
     names: set[str] = set()
     for raw_path in paths:
         path = PurePosixPath(raw_path)
@@ -162,7 +173,7 @@ def sync(ref: str) -> str:
         upstream_root = extract_archive(archive, Path(temporary))
         manifest_path = upstream_root / ".claude-plugin" / "plugin.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        paths = promoted_skill_paths(manifest)
+        paths = selected_skill_paths(upstream_root, manifest)
         names = {
             PurePosixPath(raw_path).name: prefixed_skill_name(PurePosixPath(raw_path).name)
             for raw_path in paths
@@ -176,7 +187,7 @@ def sync(ref: str) -> str:
         for raw_path in paths:
             source = upstream_root / PurePosixPath(raw_path.removeprefix("./"))
             if not (source / "SKILL.md").is_file():
-                raise RuntimeError(f"promoted skill is missing SKILL.md: {raw_path}")
+                raise RuntimeError(f"selected skill is missing SKILL.md: {raw_path}")
             destination = skills_root / names[source.name]
             shutil.copytree(source, destination, symlinks=False)
             make_codex_compatible(destination)
@@ -201,8 +212,8 @@ def sync(ref: str) -> str:
         "[Matt Pocock's skills repository](https://github.com/mattpocock/skills).\n\n"
         f"- Upstream ref: `{ref}`\n"
         f"- Upstream commit used for this build: `{sha}`\n"
-        f"- Included content: the {len(paths)} skills listed by upstream's promoted Claude Code plugin manifest\n"
-        "- Excluded content: upstream's `misc/`, `in-progress/`, and `deprecated/` buckets\n"
+        f"- Included content: {len(paths)} promoted and in-progress upstream skills\n"
+        "- Excluded content: upstream's `misc/` and `deprecated/` buckets\n"
         f"- Codex skill namespace: every included skill is prefixed with `{SKILL_PREFIX}`\n"
         "- Codex adaptation: Claude-only `disable-model-invocation: true` metadata is normalized to `false`\n"
         "- License: MIT, reproduced in [`LICENSE`](./LICENSE)\n\n"

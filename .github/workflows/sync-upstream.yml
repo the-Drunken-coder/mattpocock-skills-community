@@ -2,8 +2,9 @@ name: Sync upstream skills
 
 on:
   schedule:
-    - cron: "5 0 * * *"
-      timezone: "America/New_York"
+    # GitHub cannot subscribe to pushes in another repository, so poll Matt's
+    # main branch. The sync and commit steps are no-ops when nothing changed.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -31,11 +32,12 @@ jobs:
       - name: Check generated files
         run: |
           python3 -m py_compile scripts/sync_upstream.py
+          python3 -m unittest discover -s tests -q
           git diff --check
 
       - name: Commit and push changes
         run: |
-          if git diff --quiet; then
+          if [[ -z "$(git status --porcelain)" ]]; then
             echo "Upstream is already synchronized."
             exit 0
           fi
