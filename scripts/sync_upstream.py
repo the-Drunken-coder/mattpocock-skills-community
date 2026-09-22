@@ -7,10 +7,10 @@ import argparse
 import json
 import re
 import shutil
+import subprocess
 import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
-from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
@@ -36,12 +36,24 @@ def fetch(url: str) -> bytes:
 
 
 def upstream_sha(ref: str) -> str:
-    payload = json.loads(
-        fetch(f"https://api.github.com/repos/{REPOSITORY}/commits/{quote(ref, safe='')}")
+    result = subprocess.run(
+        [
+            "git",
+            "ls-remote",
+            f"https://github.com/{REPOSITORY}.git",
+            f"refs/heads/{ref}",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
     )
-    sha = payload.get("sha")
-    if not isinstance(sha, str) or len(sha) != 40:
-        raise RuntimeError("GitHub did not return a full upstream commit SHA")
+    line = result.stdout.strip()
+    if not line:
+        raise RuntimeError(f"upstream ref does not exist: {ref}")
+
+    sha = line.split()[0]
+    if not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise RuntimeError(f"invalid upstream SHA: {sha}")
     return sha
 
 
@@ -167,7 +179,7 @@ def namespace_skill_tree(skill_root: Path, names: dict[str, str]) -> None:
 
 def sync(ref: str) -> str:
     sha = upstream_sha(ref)
-    archive = fetch(f"https://github.com/{REPOSITORY}/archive/refs/heads/{quote(ref, safe='')}.tar.gz")
+    archive = fetch(f"https://github.com/{REPOSITORY}/archive/{sha}.tar.gz")
 
     with tempfile.TemporaryDirectory(prefix="mattpocock-skills-") as temporary:
         upstream_root = extract_archive(archive, Path(temporary))
