@@ -1,8 +1,9 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
-from scripts.sync_upstream import selected_skill_paths
+from scripts.sync_upstream import selected_skill_paths, upstream_sha
 
 
 class SelectedSkillPathsTests(unittest.TestCase):
@@ -50,6 +51,26 @@ class SelectedSkillPathsTests(unittest.TestCase):
                     root,
                     {"license": "MIT", "skills": ["./skills/engineering/pr"]},
                 )
+
+
+class UpstreamShaTests(unittest.TestCase):
+    @patch("scripts.sync_upstream.subprocess.run")
+    def test_resolves_branch_with_git_ls_remote(self, run: Mock) -> None:
+        sha = "0123456789abcdef0123456789abcdef01234567"
+        run.return_value = Mock(stdout=f"{sha}\trefs/heads/main\n")
+
+        self.assertEqual(upstream_sha("main"), sha)
+        run.assert_called_once_with(
+            [
+                "git",
+                "ls-remote",
+                "https://github.com/mattpocock/skills.git",
+                "refs/heads/main",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
 
 if __name__ == "__main__":
