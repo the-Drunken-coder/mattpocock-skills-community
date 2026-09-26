@@ -36,22 +36,33 @@ def fetch(url: str) -> bytes:
 
 
 def upstream_sha(ref: str) -> str:
-    result = subprocess.run(
-        [
-            "git",
-            "ls-remote",
-            f"https://github.com/{REPOSITORY}.git",
-            f"refs/heads/{ref}",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    line = result.stdout.strip()
-    if not line:
-        raise RuntimeError(f"upstream ref does not exist: {ref}")
+    command = [
+        "git",
+        "ls-remote",
+        f"https://github.com/{REPOSITORY}.git",
+        f"refs/heads/{ref}",
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"timed out resolving upstream ref: {ref}") from error
 
-    sha = line.split()[0]
+    expected_ref = f"refs/heads/{ref}"
+    matches = []
+    for line in result.stdout.splitlines():
+        sha, separator, returned_ref = line.partition("\t")
+        if separator and returned_ref == expected_ref:
+            matches.append(sha)
+    if len(matches) != 1:
+        raise RuntimeError(f"upstream ref is not uniquely resolved: {ref}")
+
+    sha = matches[0]
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise RuntimeError(f"invalid upstream SHA: {sha}")
     return sha

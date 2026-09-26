@@ -1,3 +1,4 @@
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -70,7 +71,34 @@ class UpstreamShaTests(unittest.TestCase):
             check=True,
             capture_output=True,
             text=True,
+            timeout=60,
         )
+
+    @patch("scripts.sync_upstream.subprocess.run")
+    def test_ignores_other_refs_in_git_output(self, run: Mock) -> None:
+        expected = "0123456789abcdef0123456789abcdef01234567"
+        other = "fedcba9876543210fedcba9876543210fedcba98"
+        run.return_value = Mock(
+            stdout=f"{other}\trefs/heads/main-old\n{expected}\trefs/heads/main\n"
+        )
+
+        self.assertEqual(upstream_sha("main"), expected)
+
+    @patch("scripts.sync_upstream.subprocess.run")
+    def test_rejects_missing_exact_ref(self, run: Mock) -> None:
+        run.return_value = Mock(
+            stdout="0123456789abcdef0123456789abcdef01234567\trefs/heads/main-old\n"
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "not uniquely resolved: main"):
+            upstream_sha("main")
+
+    @patch("scripts.sync_upstream.subprocess.run")
+    def test_reports_git_timeout(self, run: Mock) -> None:
+        run.side_effect = subprocess.TimeoutExpired(["git", "ls-remote"], 60)
+
+        with self.assertRaisesRegex(RuntimeError, "timed out resolving upstream ref: main"):
+            upstream_sha("main")
 
 
 if __name__ == "__main__":
