@@ -1,8 +1,10 @@
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
-from scripts.sync_upstream import selected_skill_paths
+from scripts.sync_upstream import selected_skill_paths, upstream_sha
 
 
 class SelectedSkillPathsTests(unittest.TestCase):
@@ -50,6 +52,53 @@ class SelectedSkillPathsTests(unittest.TestCase):
                     root,
                     {"license": "MIT", "skills": ["./skills/engineering/pr"]},
                 )
+
+
+class UpstreamShaTests(unittest.TestCase):
+    @patch("scripts.sync_upstream.subprocess.run")
+    def test_resolves_branch_with_git_ls_remote(self, run: Mock) -> None:
+        sha = "0123456789abcdef0123456789abcdef01234567"
+        run.return_value = Mock(stdout=f"{sha}\trefs/heads/main\n")
+
+        self.assertEqual(upstream_sha("main"), sha)
+        run.assert_called_once_with(
+            [
+                "git",
+                "ls-remote",
+                "https://github.com/mattpocock/skills.git",
+                "refs/heads/main",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    @patch("scripts.sync_upstream.subprocess.run")
+    def test_ignores_other_refs_in_git_output(self, run: Mock) -> None:
+        expected = "0123456789abcdef0123456789abcdef01234567"
+        other = "fedcba9876543210fedcba9876543210fedcba98"
+        run.return_value = Mock(
+            stdout=f"{other}\trefs/heads/main-old\n{expected}\trefs/heads/main\n"
+        )
+
+        self.assertEqual(upstream_sha("main"), expected)
+
+    @patch("scripts.sync_upstream.subprocess.run")
+    def test_rejects_missing_exact_ref(self, run: Mock) -> None:
+        run.return_value = Mock(
+            stdout="0123456789abcdef0123456789abcdef01234567\trefs/heads/main-old\n"
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "not uniquely resolved: main"):
+            upstream_sha("main")
+
+    @patch("scripts.sync_upstream.subprocess.run")
+    def test_reports_git_timeout(self, run: Mock) -> None:
+        run.side_effect = subprocess.TimeoutExpired(["git", "ls-remote"], 60)
+
+        with self.assertRaisesRegex(RuntimeError, "timed out resolving upstream ref: main"):
+            upstream_sha("main")
 
 
 if __name__ == "__main__":
