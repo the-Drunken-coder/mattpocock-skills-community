@@ -5,13 +5,21 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from urllib.request import Request, urlopen
+
+if __package__:
+    from .artifact_labels import apply_artifact_labels, strip_artifact_labels
+else:
+    from artifact_labels import apply_artifact_labels, strip_artifact_labels
 
 
 REPOSITORY = "mattpocock/skills"
@@ -188,11 +196,33 @@ def namespace_skill_tree(skill_root: Path, names: dict[str, str]) -> None:
             path.write_text(normalized, encoding="utf-8")
 
 
-def sync(ref: str) -> str:
+def recorded_sha(root: Path) -> str | None:
+    notice = root / "THIRD_PARTY_NOTICES.md"
+    if not notice.is_file():
+        return None
+    match = re.search(
+        r"Upstream commit used for this build: `([0-9a-f]{40})`",
+        notice.read_text(encoding="utf-8"),
+    )
+    return match.group(1) if match else None
+
+
+def sync(ref: str, *, report: dict[str, object] | None = None) -> str:
+    state = report if report is not None else {}
+    state.update(
+        status="running",
+        started_at=datetime.now(timezone.utc).isoformat(),
+        upstream_ref=ref,
+        previous_upstream_commit=recorded_sha(PLUGIN_ROOT),
+        stage="resolve upstream",
+    )
     sha = upstream_sha(ref)
+    state.update(upstream_commit=sha, stage="download upstream")
     archive = fetch(f"https://github.com/{REPOSITORY}/archive/{sha}.tar.gz")
 
-    with tempfile.TemporaryDirectory(prefix="mattpocock-skills-") as temporary:
+    # Stage on the same filesystem so the validated skill tree can be renamed.
+    with tempfile.TemporaryDirectory(prefix=".sync-", dir=PLUGIN_ROOT) as temporary:
+        state["stage"] = "generate package"
         upstream_root = extract_archive(archive, Path(temporary))
         manifest_path = upstream_root / ".claude-plugin" / "plugin.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -202,9 +232,8 @@ def sync(ref: str) -> str:
             for raw_path in paths
         }
 
-        skills_root = PLUGIN_ROOT / "skills"
-        if skills_root.exists():
-            shutil.rmtree(skills_root)
+        generated_root = Path(temporary) / "generated"
+        skills_root = generated_root / "skills"
         skills_root.mkdir(parents=True)
 
         for raw_path in paths:
@@ -216,43 +245,119 @@ def sync(ref: str) -> str:
             make_codex_compatible(destination)
             namespace_skill_tree(destination, names)
 
-        shutil.copy2(upstream_root / "LICENSE", PLUGIN_ROOT / "LICENSE")
+        state.update(stage="validate artifact labels", skill_count=len(paths))
+        adaptations = apply_artifact_labels(skills_root)
+        apply_artifact_labels(skills_root, check=True)
+        state["adaptations"] = adaptations
+        changed_sources = []
+        for adaptation in adaptations:
+            relative = str(adaptation["path"])
+            previous = PLUGIN_ROOT / "skills" / relative
+            if not previous.is_file() or strip_artifact_labels(
+                relative, previous.read_text(encoding="utf-8")
+            ) != strip_artifact_labels(
+                relative, (skills_root / relative).read_text(encoding="utf-8")
+            ):
+                changed_sources.append(relative)
+        state["changed_adaptation_sources"] = changed_sources
 
-    for manifest_path in (
-        PLUGIN_ROOT / ".codex-plugin" / "plugin.json",
-        PLUGIN_ROOT / "plugin.json",
-    ):
-        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        current_version = payload.get("version")
-        if not isinstance(current_version, str):
-            raise RuntimeError(f"manifest has no version: {manifest_path}")
-        payload["version"] = version_for_sha(current_version, sha)
-        write_json(manifest_path, payload)
+        shutil.copy2(upstream_root / "LICENSE", generated_root / "LICENSE")
+        for relative in (".codex-plugin/plugin.json", "plugin.json"):
+            manifest_path = PLUGIN_ROOT / relative
+            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+            current_version = payload.get("version")
+            if not isinstance(current_version, str):
+                raise RuntimeError(f"manifest has no version: {manifest_path}")
+            payload["version"] = version_for_sha(current_version, sha)
+            destination = generated_root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            write_json(destination, payload)
 
-    (PLUGIN_ROOT / "THIRD_PARTY_NOTICES.md").write_text(
-        "# Third-party notices\n\n"
-        "This package is an unofficial Codex adaptation of "
-        "[Matt Pocock's skills repository](https://github.com/mattpocock/skills).\n\n"
-        f"- Upstream ref: `{ref}`\n"
-        f"- Upstream commit used for this build: `{sha}`\n"
-        f"- Included content: {len(paths)} promoted and in-progress upstream skills\n"
-        "- Excluded content: upstream's `misc/` and `deprecated/` buckets\n"
-        f"- Codex skill namespace: every included skill is prefixed with `{SKILL_PREFIX}`\n"
-        "- Codex adaptation: Claude-only `disable-model-invocation: true` metadata is normalized to `false`\n"
-        "- License: MIT, reproduced in [`LICENSE`](./LICENSE)\n\n"
-        "The package is maintained independently. It is not affiliated with or endorsed by "
-        "Matt Pocock, AI Hero, or OpenAI. Local metadata and synchronization code are "
-        "provided by Lane Araujo under the MIT license.\n",
-        encoding="utf-8",
-    )
+        (generated_root / "THIRD_PARTY_NOTICES.md").write_text(
+            "# Third-party notices\n\n"
+            "This package is an unofficial Codex adaptation of "
+            "[Matt Pocock's skills repository](https://github.com/mattpocock/skills).\n\n"
+            f"- Upstream ref: `{ref}`\n"
+            f"- Upstream commit used for this build: `{sha}`\n"
+            f"- Included content: {len(paths)} promoted and in-progress upstream skills\n"
+            "- Excluded content: upstream's `misc/` and `deprecated/` buckets\n"
+            f"- Codex skill namespace: every included skill is prefixed with `{SKILL_PREFIX}`\n"
+            "- Codex adaptation: Claude-only `disable-model-invocation: true` metadata is normalized to `false`\n"
+            "- Community adaptation: specs, tickets, and Wayfinder maps receive `kind:spec`, `kind:ticket`, and `kind:map` respectively; local Markdown records an equivalent Kind field\n"
+            "- License: MIT, reproduced in [`LICENSE`](./LICENSE)\n\n"
+            "The package is maintained independently. It is not affiliated with or endorsed by "
+            "Matt Pocock, AI Hero, or OpenAI. Local metadata and synchronization code are "
+            "provided by Lane Araujo under the MIT license.\n",
+            encoding="utf-8",
+        )
+
+        state["stage"] = "publish generated package"
+        installed_skills = PLUGIN_ROOT / "skills"
+        backup = Path(temporary) / "previous-skills"
+        if installed_skills.exists():
+            installed_skills.replace(backup)
+        try:
+            skills_root.replace(installed_skills)
+        except OSError:
+            if backup.exists():
+                backup.replace(installed_skills)
+            raise
+        for relative in (".codex-plugin/plugin.json", "plugin.json", "LICENSE", "THIRD_PARTY_NOTICES.md"):
+            (generated_root / relative).replace(PLUGIN_ROOT / relative)
+
+    state.update(status="success", stage="complete", finished_at=datetime.now(timezone.utc).isoformat())
     return sha
+
+
+def write_report(report: dict[str, object], path: Path | None) -> None:
+    if path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_json(path, report)
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if summary_path:
+        lines = [
+            "## Upstream skill sync",
+            "",
+            f"- Status: **{report['status']}**",
+            f"- Stage: {report.get('stage', 'unknown')}",
+            f"- Previous upstream commit: `{report.get('previous_upstream_commit') or 'none'}`",
+            f"- Checked upstream commit: `{report.get('upstream_commit') or 'unresolved'}`",
+            f"- Included skills: {report.get('skill_count', 'unknown')}",
+        ]
+        if report.get("error"):
+            lines.extend(["", "```text", str(report["error"]), "```"])
+        adaptations = report.get("adaptations", [])
+        if adaptations:
+            lines.extend(["", "| Validated file | Artifact kinds |", "| --- | --- |"])
+            for entry in adaptations:
+                lines.append(f"| `{entry['path']}` | {', '.join(entry['kinds'])} |")
+        changed = report.get("changed_adaptation_sources", [])
+        if changed:
+            lines.extend(["", "Upstream content changed in adapted files:", ""])
+            lines.extend(f"- `{relative}`" for relative in changed)
+        with Path(summary_path).open("a", encoding="utf-8") as summary:
+            summary.write("\n".join(lines) + "\n")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ref", default=DEFAULT_REF, help="upstream branch name (default: main)")
+    parser.add_argument("--report", type=Path, help="write a JSON health report, including on failure")
+    parser.add_argument("--check", action="store_true", help="validate the bundled artifact-label adaptations without syncing")
     args = parser.parse_args()
-    sha = sync(args.ref)
+    if args.check:
+        apply_artifact_labels(PLUGIN_ROOT / "skills", check=True)
+        print("Artifact-label adaptations are valid.")
+        return
+    report: dict[str, object] = {}
+    try:
+        sha = sync(args.ref, report=report)
+    except Exception as error:
+        report.update(status="failure", error=str(error), finished_at=datetime.now(timezone.utc).isoformat())
+        write_report(report, args.report)
+        print(f"Sync failed during {report.get('stage', 'startup')}: {error}", file=sys.stderr)
+        raise SystemExit(1) from error
+    write_report(report, args.report)
     print(f"Synchronized {REPOSITORY}@{args.ref} ({sha})")
 
 

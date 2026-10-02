@@ -1,3 +1,6 @@
 __pycache__/
 *.py[cod]
 .DS_Store
+.sync-*/
+.sync-report.json
+.sync-health.json
