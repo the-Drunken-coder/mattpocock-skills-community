@@ -44,7 +44,7 @@ These labels accompany the existing triage, category, and `wayfinder:*` labels. 
 
 ## Sync monitoring
 
-Each sync stages and validates the complete package before replacing the bundled skills. A removed skill, missing or ambiguous insertion point, changed publishing contract, or new upstream `kind:` vocabulary stops the sync before publication. The previously generated package remains intact if generation or validation fails.
+Each sync stages and validates the complete package before replacing the bundled skills. A removed skill, missing or ambiguous insertion point, changed publishing contract, or new upstream `kind:` vocabulary stops the sync before publication. Generation and validation failures preserve the previous package. Publication errors roll back both the skills tree and all metadata files, including restoring the absence of files that did not previously exist. If rollback itself fails, the failure report identifies retained recovery backups.
 
 The sync run summary and downloadable `upstream-sync-report` artifact include the previous and checked upstream commits, skill count, validated kind assignments, hashes of imported and adapted files, and any changed upstream content in the adapted files. Failures include the stage and error. Reports are retained for 14 days, and the run summary also records the publication result.
 

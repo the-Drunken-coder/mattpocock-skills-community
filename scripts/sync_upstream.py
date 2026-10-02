@@ -26,6 +26,7 @@ REPOSITORY = "mattpocock/skills"
 DEFAULT_REF = "main"
 SKILL_PREFIX = "matt-"
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_FILES = (".codex-plugin/plugin.json", "plugin.json", "LICENSE", "THIRD_PARTY_NOTICES.md")
 DISABLE_INVOCATION_RE = re.compile(
     r"^(?P<indent>\s*)disable[-_]model[-_]invocation:\s*true\s*$"
 )
@@ -197,6 +198,7 @@ def namespace_skill_tree(skill_root: Path, names: dict[str, str]) -> None:
 
 
 def recorded_sha(root: Path) -> str | None:
+    """Read the last bundled upstream commit when a notice is available."""
     notice = root / "THIRD_PARTY_NOTICES.md"
     if not notice.is_file():
         return None
@@ -207,7 +209,70 @@ def recorded_sha(root: Path) -> str | None:
     return match.group(1) if match else None
 
 
+def publish_package(generated_root: Path, package_root: Path) -> None:
+    """Publish all outputs together, retaining backups if rollback cannot finish."""
+    backup_root = Path(tempfile.mkdtemp(prefix=".sync-backup-", dir=package_root))
+    installed_skills = package_root / "skills"
+    generated_skills = generated_root / "skills"
+    backup_skills = backup_root / "skills"
+    metadata_present: dict[str, bool] = {}
+    published_metadata: list[str] = []
+    skills_backed_up = False
+    skills_installed = False
+    retain_backup = False
+    try:
+        # Snapshot metadata before changing any installed package output.
+        for relative in PACKAGE_FILES:
+            target = package_root / relative
+            metadata_present[relative] = target.exists()
+            if metadata_present[relative]:
+                destination = backup_root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(target, destination)
+        try:
+            if installed_skills.exists():
+                installed_skills.replace(backup_skills)
+                skills_backed_up = True
+            generated_skills.replace(installed_skills)
+            skills_installed = True
+            for relative in PACKAGE_FILES:
+                (generated_root / relative).replace(package_root / relative)
+                published_metadata.append(relative)
+        except OSError as publication_error:
+            rollback_errors = []
+            for relative in reversed(published_metadata):
+                try:
+                    target = package_root / relative
+                    if metadata_present[relative]:
+                        (backup_root / relative).replace(target)
+                    else:
+                        target.unlink()
+                except OSError as error:
+                    rollback_errors.append(f"{relative}: {error}")
+            if skills_installed:
+                try:
+                    installed_skills.replace(generated_skills)
+                except OSError as error:
+                    rollback_errors.append(f"remove new skills: {error}")
+            if skills_backed_up:
+                try:
+                    backup_skills.replace(installed_skills)
+                except OSError as error:
+                    rollback_errors.append(f"restore previous skills: {error}")
+            if rollback_errors:
+                retain_backup = True
+                raise RuntimeError(
+                    f"Publication failed ({publication_error}); rollback incomplete: "
+                    f"{'; '.join(rollback_errors)}. Recovery backups retained at {backup_root}"
+                ) from publication_error
+            raise
+    finally:
+        if not retain_backup:
+            shutil.rmtree(backup_root, ignore_errors=True)
+
+
 def sync(ref: str, *, report: dict[str, object] | None = None) -> str:
+    """Import upstream, validate adaptations, and publish a complete package."""
     state = report if report is not None else {}
     state.update(
         status="running",
@@ -292,24 +357,14 @@ def sync(ref: str, *, report: dict[str, object] | None = None) -> str:
         )
 
         state["stage"] = "publish generated package"
-        installed_skills = PLUGIN_ROOT / "skills"
-        backup = Path(temporary) / "previous-skills"
-        if installed_skills.exists():
-            installed_skills.replace(backup)
-        try:
-            skills_root.replace(installed_skills)
-        except OSError:
-            if backup.exists():
-                backup.replace(installed_skills)
-            raise
-        for relative in (".codex-plugin/plugin.json", "plugin.json", "LICENSE", "THIRD_PARTY_NOTICES.md"):
-            (generated_root / relative).replace(PLUGIN_ROOT / relative)
+        publish_package(generated_root, PLUGIN_ROOT)
 
     state.update(status="success", stage="complete", finished_at=datetime.now(timezone.utc).isoformat())
     return sha
 
 
 def write_report(report: dict[str, object], path: Path | None) -> None:
+    """Write optional JSON diagnostics and the Actions run summary."""
     if path:
         path.parent.mkdir(parents=True, exist_ok=True)
         write_json(path, report)
@@ -340,6 +395,7 @@ def write_report(report: dict[str, object], path: Path | None) -> None:
 
 
 def main() -> None:
+    """Run a sync or validate the current bundle, reporting sync failures."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ref", default=DEFAULT_REF, help="upstream branch name (default: main)")
     parser.add_argument("--report", type=Path, help="write a JSON health report, including on failure")

@@ -20,6 +20,7 @@ def run(
     event: str = "schedule",
     status: str = "completed",
 ) -> dict[str, object]:
+    """Create an Actions run fixture at a controlled age."""
     return {
         "status": status,
         "conclusion": conclusion,
@@ -106,7 +107,7 @@ class SyncHealthTests(unittest.TestCase):
             ):
                 monitor_sync.main()
             self.assertEqual(error.exception.code, 1)
-            report = json.loads(report_path.read_text())
+            report = json.loads(report_path.read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "failure")
             self.assertTrue(
                 any("disabled_manually" in reason for reason in report["reasons"])
@@ -137,7 +138,7 @@ class SyncHealthTests(unittest.TestCase):
             ):
                 monitor_sync.main()
             self.assertEqual(error.exception.code, 1)
-            report = json.loads(report_path.read_text())
+            report = json.loads(report_path.read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "failure")
             self.assertIn("API unavailable", report["reasons"][0])
 

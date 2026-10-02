@@ -19,6 +19,7 @@ def evaluate_health(
     now: datetime,
     max_age: timedelta = timedelta(hours=2),
 ) -> dict[str, object]:
+    """Assess default-branch sync results and the age of the last success."""
     completed = [
         run
         for run in runs
@@ -59,6 +60,7 @@ def evaluate_health(
 
 
 def github_json(endpoint: str) -> dict[str, object]:
+    """Read an Actions API response using the authenticated GitHub CLI."""
     result = subprocess.run(
         ["gh", "api", endpoint], check=True, capture_output=True, text=True, timeout=60
     )
@@ -66,6 +68,7 @@ def github_json(endpoint: str) -> dict[str, object]:
 
 
 def main() -> None:
+    """Emit a health report and fail when sync is unhealthy or uncheckable."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY"))
     parser.add_argument("--branch", required=True)
