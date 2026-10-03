@@ -1,0 +1,41 @@
+name: Monitor upstream sync
+
+on:
+  schedule:
+    - cron: "43 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: monitor-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  health:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Check last sync result and freshness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: python3 scripts/monitor_sync.py --branch "$DEFAULT_BRANCH" --max-age-hours 2 --report .sync-health.json
+
+      - name: Keep health report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: upstream-sync-health
+          path: .sync-health.json
+          include-hidden-files: true
+          retention-days: 14
