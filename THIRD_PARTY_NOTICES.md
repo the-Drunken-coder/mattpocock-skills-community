@@ -3,8 +3,8 @@
 This package is an unofficial Codex adaptation of [Matt Pocock's skills repository](https://github.com/mattpocock/skills).
 
 - Upstream ref: `main`
-- Upstream commit used for this build: `f6abdeb8dd2a9be64f924ab44c7af374cb76726d`
-- Included content: 33 promoted and in-progress upstream skills
+- Upstream commit used for this build: `4588b32ecab9ecc9fc8cc6b6c5e7d675b6004b0d`
+- Included content: 34 promoted and in-progress upstream skills
 - Excluded content: upstream's `misc/` and `deprecated/` buckets
 - Codex skill namespace: every included skill is prefixed with `matt-`
 - Codex adaptation: Claude-only `disable-model-invocation: true` metadata is normalized to `false`
