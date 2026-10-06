@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "mattpocock-skills-community",
-  "version": "0.3.0+upstream.4588b32e",
+  "version": "0.3.0+upstream.7a030a8b",
   "description": "Unofficial Codex package of Matt Pocock's MIT-licensed engineering skills.",
   "author": {
     "name": "Lane Araujo"
