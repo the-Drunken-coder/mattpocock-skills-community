@@ -1,0 +1,5 @@
+interface:
+  display_name: "Matt: Red Team"
+  short_description: "Attack a specification before implementation"
+policy:
+  allow_implicit_invocation: false

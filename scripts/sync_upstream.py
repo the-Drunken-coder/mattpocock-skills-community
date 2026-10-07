@@ -129,6 +129,20 @@ def selected_skill_paths(
     return paths
 
 
+def community_skill_paths(root: Path | None = None) -> list[Path]:
+    """Return locally maintained skills that extend the upstream bundle."""
+    root = PLUGIN_ROOT / "community-skills" if root is None else root
+    if not root.is_dir():
+        return []
+    paths = sorted(
+        path for path in root.iterdir() if path.is_dir() and (path / "SKILL.md").is_file()
+    )
+    names = [path.name for path in paths]
+    if len(names) != len(set(names)):
+        raise RuntimeError("duplicate community skill directory")
+    return paths
+
+
 def version_for_sha(current: str, sha: str) -> str:
     base = current.split("+", maxsplit=1)[0]
     return f"{base}+upstream.{sha[:8]}"
@@ -292,6 +306,7 @@ def sync(ref: str, *, report: dict[str, object] | None = None) -> str:
         manifest_path = upstream_root / ".claude-plugin" / "plugin.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         paths = selected_skill_paths(upstream_root, manifest)
+        community_paths = community_skill_paths()
         names = {
             PurePosixPath(raw_path).name: prefixed_skill_name(PurePosixPath(raw_path).name)
             for raw_path in paths
@@ -310,7 +325,18 @@ def sync(ref: str, *, report: dict[str, object] | None = None) -> str:
             make_codex_compatible(destination)
             namespace_skill_tree(destination, names)
 
-        state.update(stage="validate artifact labels", skill_count=len(paths))
+        for source in community_paths:
+            if source.name in names:
+                raise RuntimeError(f"community skill conflicts with upstream skill: {source.name}")
+            destination = skills_root / source.name
+            shutil.copytree(source, destination, symlinks=False)
+            make_codex_compatible(destination)
+
+        state.update(
+            stage="validate artifact labels",
+            skill_count=len(paths) + len(community_paths),
+            community_skill_count=len(community_paths),
+        )
         adaptations = apply_artifact_labels(skills_root)
         apply_artifact_labels(skills_root, check=True)
         state["adaptations"] = adaptations
@@ -344,7 +370,7 @@ def sync(ref: str, *, report: dict[str, object] | None = None) -> str:
             "[Matt Pocock's skills repository](https://github.com/mattpocock/skills).\n\n"
             f"- Upstream ref: `{ref}`\n"
             f"- Upstream commit used for this build: `{sha}`\n"
-            f"- Included content: {len(paths)} promoted and in-progress upstream skills\n"
+            f"- Included content: {len(paths)} promoted and in-progress upstream skills plus {len(community_paths)} community skills\n"
             "- Excluded content: upstream's `misc/` and `deprecated/` buckets\n"
             f"- Codex skill namespace: every included skill is prefixed with `{SKILL_PREFIX}`\n"
             "- Codex adaptation: Claude-only `disable-model-invocation: true` metadata is normalized to `false`\n"

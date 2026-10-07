@@ -1,0 +1,5 @@
+interface:
+  display_name: "Matt: To Story Map"
+  short_description: "Turn product vision into a durable user journey map"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Matt: Ping Pong"
+  short_description: "Keep the conversation direct and one point at a time"
+policy:
+  allow_implicit_invocation: false

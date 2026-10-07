@@ -1,0 +1,5 @@
+interface:
+  display_name: "Matt: Grill Questionnaire"
+  short_description: "Answer independent planning questions in one local form"
+policy:
+  allow_implicit_invocation: false

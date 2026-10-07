@@ -1,0 +1,5 @@
+interface:
+  display_name: "Matt: Wrap Up"
+  short_description: "Verify and close out the current work session"
+policy:
+  allow_implicit_invocation: false

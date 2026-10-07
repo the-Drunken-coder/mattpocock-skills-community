@@ -1,0 +1,5 @@
+interface:
+  display_name: "Matt: Subtractive Review"
+  short_description: "Find unnecessary complexity to remove"
+policy:
+  allow_implicit_invocation: false

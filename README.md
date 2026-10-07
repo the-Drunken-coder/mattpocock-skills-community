@@ -4,7 +4,7 @@
 [![Monitor upstream sync](https://github.com/the-Drunken-coder/mattpocock-skills-community/actions/workflows/monitor-sync.yml/badge.svg)](https://github.com/the-Drunken-coder/mattpocock-skills-community/actions/workflows/monitor-sync.yml)
 [![Validate plugin](https://github.com/the-Drunken-coder/mattpocock-skills-community/actions/workflows/validate.yml/badge.svg)](https://github.com/the-Drunken-coder/mattpocock-skills-community/actions/workflows/validate.yml)
 
-This is an unofficial Codex package containing the engineering and productivity skills selected by Matt Pocock's upstream Claude Code plugin manifest, plus every skill in upstream's `skills/in-progress/` directory. It is not affiliated with or endorsed by Matt Pocock, AI Hero, or OpenAI.
+This is an unofficial Codex package containing the engineering and productivity skills selected by Matt Pocock's upstream Claude Code plugin manifest, plus every skill in upstream's `skills/in-progress/` directory and a small set of community additions inspired by public proposals. It is not affiliated with or endorsed by Matt Pocock, AI Hero, or OpenAI.
 
 Every skill is namespaced with the `matt-` prefix, for example `/matt-code-review`, so these skills do not collide with other Codex skills.
 
@@ -61,4 +61,4 @@ python3 -m unittest discover -s tests -v
 
 ## Scope
 
-The package deliberately excludes upstream's `misc/` and `deprecated/` buckets. In-progress skills can change or disappear without notice, so review automated updates on the package's default branch.
+The package deliberately excludes upstream's `misc/` and `deprecated/` buckets. Community additions live in [`community-skills/`](./community-skills/) and are copied into the plugin by the sync process. In-progress and community skills can change or disappear without notice, so review automated updates on the package's default branch.

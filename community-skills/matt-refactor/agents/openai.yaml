@@ -1,0 +1,5 @@
+interface:
+  display_name: "Matt: Refactor"
+  short_description: "Simplify code while preserving its behavior"
+policy:
+  allow_implicit_invocation: false

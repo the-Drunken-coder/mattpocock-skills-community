@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from scripts.sync_upstream import selected_skill_paths, upstream_sha
+from scripts.sync_upstream import community_skill_paths, selected_skill_paths, upstream_sha
 
 
 class SelectedSkillPathsTests(unittest.TestCase):
@@ -52,6 +52,25 @@ class SelectedSkillPathsTests(unittest.TestCase):
                     root,
                     {"license": "MIT", "skills": ["./skills/engineering/pr"]},
                 )
+
+
+class CommunitySkillPathsTests(unittest.TestCase):
+    def test_returns_skill_directories_in_name_order(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name in ("matt-z", "matt-a"):
+                skill_root = root / name
+                skill_root.mkdir()
+                (skill_root / "SKILL.md").write_text("---\nname: test\n---\n")
+            (root / "notes").mkdir()
+
+            paths = community_skill_paths(root)
+
+        self.assertEqual([path.name for path in paths], ["matt-a", "matt-z"])
+
+    def test_missing_root_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            self.assertEqual(community_skill_paths(Path(temporary) / "missing"), [])
 
 
 class UpstreamShaTests(unittest.TestCase):

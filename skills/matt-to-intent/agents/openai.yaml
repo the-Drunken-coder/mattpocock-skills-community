@@ -1,0 +1,5 @@
+interface:
+  display_name: "Matt: To Intent"
+  short_description: "Clarify the outcome before writing a specification"
+policy:
+  allow_implicit_invocation: false

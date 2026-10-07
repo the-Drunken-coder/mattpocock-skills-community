@@ -4,7 +4,7 @@ This package is an unofficial Codex adaptation of [Matt Pocock's skills reposito
 
 - Upstream ref: `main`
 - Upstream commit used for this build: `6fd947921b935b7e1e69293a200400f0fdd5c15f`
-- Included content: 34 promoted and in-progress upstream skills
+- Included content: 34 promoted and in-progress upstream skills plus 9 community skills
 - Excluded content: upstream's `misc/` and `deprecated/` buckets
 - Codex skill namespace: every included skill is prefixed with `matt-`
 - Codex adaptation: Claude-only `disable-model-invocation: true` metadata is normalized to `false`
