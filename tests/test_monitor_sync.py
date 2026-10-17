@@ -46,9 +46,9 @@ class SyncHealthTests(unittest.TestCase):
         self.assertEqual(report["last_success_url"], run(20)["html_url"])
 
     def test_stale_success_is_unhealthy(self) -> None:
-        report = evaluate_health([run(121)], branch="main", now=NOW)
+        report = evaluate_health([run(361)], branch="main", now=NOW)
         self.assertEqual(report["status"], "failure")
-        self.assertIn("older than 2 hours", report["reasons"][0])
+        self.assertIn("older than 6 hours", report["reasons"][0])
 
     def test_missing_success_is_unhealthy(self) -> None:
         report = evaluate_health([], branch="main", now=NOW)
@@ -57,7 +57,7 @@ class SyncHealthTests(unittest.TestCase):
 
     def test_other_branches_and_events_do_not_count_as_heartbeat(self) -> None:
         report = evaluate_health(
-            [run(5, branch="feature"), run(5, event="pull_request"), run(130)],
+            [run(5, branch="feature"), run(5, event="pull_request"), run(370)],
             branch="main",
             now=NOW,
         )
@@ -65,7 +65,7 @@ class SyncHealthTests(unittest.TestCase):
 
     def test_in_progress_run_does_not_reset_freshness(self) -> None:
         report = evaluate_health(
-            [run(0, status="in_progress"), run(130)], branch="main", now=NOW
+            [run(0, status="in_progress"), run(370)], branch="main", now=NOW
         )
         self.assertEqual(report["status"], "failure")
 

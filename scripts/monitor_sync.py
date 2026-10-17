@@ -17,7 +17,7 @@ def evaluate_health(
     *,
     branch: str,
     now: datetime,
-    max_age: timedelta = timedelta(hours=2),
+    max_age: timedelta = timedelta(hours=6),
 ) -> dict[str, object]:
     """Assess default-branch sync results and the age of the last success."""
     completed = [
@@ -72,7 +72,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY"))
     parser.add_argument("--branch", required=True)
-    parser.add_argument("--max-age-hours", type=float, default=2)
+    parser.add_argument("--max-age-hours", type=float, default=6)
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
     if not args.repository:
