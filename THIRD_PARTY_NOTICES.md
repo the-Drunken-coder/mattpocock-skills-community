@@ -3,7 +3,7 @@
 This package is an unofficial Codex adaptation of [Matt Pocock's skills repository](https://github.com/mattpocock/skills).
 
 - Upstream ref: `main`
-- Upstream commit used for this build: `6f7f7831a625f040a8e06a0e7954826b87ce775a`
+- Upstream commit used for this build: `bbadaa631c37af594e5a05c9cefacd9956136b18`
 - Included content: 35 promoted and in-progress upstream skills plus 9 community skills
 - Excluded content: upstream's `misc/` and `deprecated/` buckets
 - Codex skill namespace: every included skill is prefixed with `matt-`
